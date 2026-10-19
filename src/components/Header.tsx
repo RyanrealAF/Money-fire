@@ -1,6 +1,6 @@
 import React from 'react';
 import { ViewMode } from '../types';
-import { Flame, Search, X, Box, FolderTree, Table, Calculator, Volume2, VolumeX, FileText } from 'lucide-react';
+import { Flame, Search, X, Box, FolderTree, Table, Calculator, Volume2, VolumeX, FileText, Bug } from 'lucide-react';
 import { sound } from '../utils/audio';
 
 interface HeaderProps {
@@ -11,6 +11,7 @@ interface HeaderProps {
   soundEnabled: boolean;
   onToggleSound: () => void;
   onOpenExecutiveBrief: () => void;
+  onOpenDiagnostics: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -20,7 +21,8 @@ export const Header: React.FC<HeaderProps> = ({
   onSearchChange,
   soundEnabled,
   onToggleSound,
-  onOpenExecutiveBrief
+  onOpenExecutiveBrief,
+  onOpenDiagnostics
 }) => {
   const handleModeSwitch = (mode: ViewMode) => {
     sound.playModeSwitch();
@@ -148,6 +150,16 @@ export const Header: React.FC<HeaderProps> = ({
           ) : (
             <VolumeX className="w-3.5 h-3.5 text-stone-500" />
           )}
+        </button>
+
+        {/* Crash Diagnostics */}
+        <button
+          onClick={onOpenDiagnostics}
+          title="Crash diagnostics — view the on-device error log"
+          className="p-1.5 rounded-lg bg-stone-900 border border-stone-800 text-stone-400 hover:text-stone-200 hover:border-red-500/60 transition-colors"
+          aria-label="Open crash diagnostics"
+        >
+          <Bug className="w-3.5 h-3.5 text-red-400" />
         </button>
       </div>
     </header>
