@@ -44,15 +44,15 @@ export const FiscalSimulator: React.FC<FiscalSimulatorProps> = ({
 
   // Calculations
   const stats = useMemo(() => {
-    // Current Status Quo Costs
+    // Current Status Quo Costs — $43,000/person baseline at 8 sweeps/month:
+    // $12,400 sweeps & police overtime + $18,200 emergency department visits + $12,400 jail nights.
+    // Sweep frequency scales the enforcement share around the 8 ops/month baseline,
+    // so the breakdown lines always sum exactly to the headline total.
     const costPerPerson = 43000;
-    const totalStatusQuoAnnual = population * costPerPerson;
-
-    // Breakdown of Status Quo:
-    // $12,400 sweeps & police overtime + $18,200 emergency department visits + $12,400 jail nights
-    const sweepCostsAnnual = sweepsPerMonth * 12 * 4800 + population * 3200;
+    const sweepCostsAnnual = population * 12400 * (sweepsPerMonth / 8);
     const erCostsAnnual = population * 18200;
     const jailCostsAnnual = population * 12400;
+    const totalStatusQuoAnnual = sweepCostsAnnual + erCostsAnnual + jailCostsAnnual;
 
     // Status Quo Outcomes
     const statusQuoRetained = Math.round(population * 0.003); // 0.3% retention
