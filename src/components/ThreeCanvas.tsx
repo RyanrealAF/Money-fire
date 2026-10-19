@@ -38,6 +38,12 @@ export const ThreeCanvas: React.FC<ThreeCanvasProps> = ({
   const isAnimatingCamRef = useRef<boolean>(false);
   const animationFrameIdRef = useRef<number | null>(null);
 
+  // When WebGL fails (or the GPU context is lost, common on phones), show the
+  // real error on screen instead of a dead canvas — the message is what we
+  // need to diagnose the device-specific cause.
+  const [glError, setGlError] = useState<string | null>(null);
+  const [retryToken, setRetryToken] = useState(0);
+
   // Flatten and calculate 3D radial coordinates
   const processHierarchy = (
     node: MindMapNode,
@@ -104,14 +110,33 @@ export const ThreeCanvas: React.FC<ThreeCanvasProps> = ({
     camera.position.set(0, 48, 120);
     cameraRef.current = camera;
 
-    // 3. WebGL Renderer
-    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, powerPreference: 'high-performance' });
+    // 3. WebGL Renderer (guarded: surface the real error instead of a dead canvas)
+    let renderer: THREE.WebGLRenderer;
+    try {
+      renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, powerPreference: 'high-performance' });
+    } catch (err) {
+      setGlError(err instanceof Error ? err.message : String(err));
+      return;
+    }
     renderer.setSize(width, height);
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    // Cap pixel ratio on small screens: full device DPR on a phone GPU is the
+    // fastest way to exhaust graphics memory and kill the tab mid-navigation.
+    const maxDpr = (mountRef.current?.clientWidth || window.innerWidth) < 768 ? 1.5 : 2;
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, maxDpr));
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
     renderer.toneMappingExposure = 1.2;
     mountRef.current.appendChild(renderer.domElement);
     rendererRef.current = renderer;
+
+    // Surface GPU context loss (the usual phone-crash signature) as a
+    // recoverable message instead of a frozen page.
+    const onContextLost = (e: Event) => {
+      e.preventDefault();
+      setGlError(
+        'The graphics context was lost — usually the phone ran out of GPU memory while navigating. Your data is safe. Reload the 3D view to continue.'
+      );
+    };
+    renderer.domElement.addEventListener('webglcontextlost', onContextLost);
 
     // 4. OrbitControls
     const controls = new OrbitControls(camera, renderer.domElement);
@@ -415,10 +440,33 @@ export const ThreeCanvas: React.FC<ThreeCanvasProps> = ({
       if (renderer.domElement) {
         renderer.domElement.removeEventListener('pointermove', onPointerMove);
         renderer.domElement.removeEventListener('click', onClick);
+        renderer.domElement.removeEventListener('webglcontextlost', onContextLost);
       }
       if (animationFrameIdRef.current) {
         cancelAnimationFrame(animationFrameIdRef.current);
       }
+      // Release every GPU buffer this scene allocated. Without this, each
+      // visit to the 3D view leaks 57 sphere geometries + halos + materials
+      // until the tab's GPU context dies — the classic navigate-then-crash.
+      nodesArrayRef.current.forEach((n) => {
+        if (n.mesh) {
+          n.mesh.traverse((child: THREE.Object3D) => {
+            const mesh = child as THREE.Mesh;
+            if (mesh.geometry) mesh.geometry.dispose();
+            const material = mesh.material as THREE.Material | THREE.Material[] | undefined;
+            if (Array.isArray(material)) material.forEach((m) => m.dispose());
+            else if (material) material.dispose();
+          });
+          scene.remove(n.mesh);
+        }
+      });
+      linesArrayRef.current.forEach((line) => {
+        line.geometry.dispose();
+        (line.material as THREE.Material).dispose();
+        scene.remove(line);
+      });
+      nodesArrayRef.current = [];
+      linesArrayRef.current = [];
       renderer.dispose();
       particleGeometry.dispose();
       particleMaterial.dispose();
@@ -426,7 +474,7 @@ export const ThreeCanvas: React.FC<ThreeCanvasProps> = ({
         mountRef.current.removeChild(renderer.domElement);
       }
     };
-  }, [data]);
+  }, [data, retryToken]);
 
   // Handle Category Filter & Search Query Opacity Updates
   useEffect(() => {
@@ -591,8 +639,34 @@ export const ThreeCanvas: React.FC<ThreeCanvasProps> = ({
 
   return (
     <div className="relative w-full h-full overflow-hidden">
-      <div ref={mountRef} className="w-full h-full cursor-grab active:cursor-grabbing" data-testid="three-canvas" />
+      <div
+        ref={mountRef}
+        className="w-full h-full cursor-grab active:cursor-grabbing"
+        style={{ touchAction: 'none' }}
+        data-testid="three-canvas"
+      />
       <div ref={labelsContainerRef} className="absolute inset-0 pointer-events-none z-10" />
+      {glError && (
+        <div className="absolute inset-0 z-20 flex items-center justify-center bg-[#0B0C0E]/95 p-6">
+          <div className="max-w-md w-full text-center space-y-3 p-5 rounded-2xl border border-red-900/60 bg-stone-950/80">
+            <div className="text-red-400 font-mono font-bold uppercase text-sm tracking-wider">
+              3D view crashed
+            </div>
+            <p className="text-[11px] text-stone-400 font-mono break-words leading-relaxed">
+              {glError}
+            </p>
+            <button
+              onClick={() => {
+                setGlError(null);
+                setRetryToken((t) => t + 1);
+              }}
+              className="px-4 py-2 bg-red-600 hover:bg-red-500 text-white rounded-lg text-xs font-mono font-bold transition-colors"
+            >
+              Reload 3D view
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
