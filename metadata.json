@@ -1,0 +1,8 @@
+{
+  "name": "Stop The Money Fire: 3D Public Safety Mind Map",
+  "description": "An interactive 3D neural mind map, tactical policy blueprint, and municipal ROI simulator mapping the transition from reactive street sweeps to functional public safety infrastructure.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
