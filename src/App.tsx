@@ -10,7 +10,9 @@ import { TreeOutlineView } from './components/TreeOutlineView';
 import { MatrixModal } from './components/MatrixModal';
 import { FiscalSimulator } from './components/FiscalSimulator';
 import { ExecutiveBriefModal } from './components/ExecutiveBriefModal';
+import { CrashLogModal } from './components/CrashLogModal';
 import { sound } from './utils/audio';
+import { setCrashContext } from './utils/crashLog';
 
 export default function App() {
   // State
@@ -21,6 +23,7 @@ export default function App() {
   const [showLabels, setShowLabels] = useState<boolean>(true);
   const [soundEnabled, setSoundEnabled] = useState<boolean>(true);
   const [isExecutiveBriefOpen, setIsExecutiveBriefOpen] = useState<boolean>(false);
+  const [isDiagnosticsOpen, setIsDiagnosticsOpen] = useState<boolean>(false);
   const [cameraPresetTrigger, setCameraPresetTrigger] = useState<{
     type: 'reset' | 'root' | 'top';
     timestamp: number;
@@ -97,6 +100,11 @@ export default function App() {
     setSoundEnabled(!soundEnabled);
   };
 
+  // Keep the crash log stamped with where the user was when it happened.
+  useEffect(() => {
+    setCrashContext({ viewMode, selectedNodeId: selectedNode?.id });
+  }, [viewMode, selectedNode]);
+
   // Keyboard navigation shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -108,6 +116,8 @@ export default function App() {
           setViewMode('3d');
         } else if (isExecutiveBriefOpen) {
           setIsExecutiveBriefOpen(false);
+        } else if (isDiagnosticsOpen) {
+          setIsDiagnosticsOpen(false);
         } else if (selectedNode && selectedNode.id !== 'root') {
           setSelectedNode(null);
         }
@@ -129,7 +139,7 @@ export default function App() {
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [viewMode, isExecutiveBriefOpen, selectedNode]);
+  }, [viewMode, isExecutiveBriefOpen, isDiagnosticsOpen, selectedNode]);
 
   return (
     <div className="relative w-screen h-screen overflow-hidden bg-[#0B0C0E] text-[#E7E0D4] font-sans">
@@ -142,6 +152,7 @@ export default function App() {
         soundEnabled={soundEnabled}
         onToggleSound={handleToggleSound}
         onOpenExecutiveBrief={() => setIsExecutiveBriefOpen(true)}
+        onOpenDiagnostics={() => setIsDiagnosticsOpen(true)}
       />
 
       {/* 2. Three.js 3D WebGL Neural Graph */}
@@ -214,6 +225,14 @@ export default function App() {
         <ExecutiveBriefModal
           isOpen={true}
           onClose={() => setIsExecutiveBriefOpen(false)}
+        />
+      )}
+
+      {/* 8b. Crash Diagnostics Modal */}
+      {isDiagnosticsOpen && (
+        <CrashLogModal
+          isOpen={true}
+          onClose={() => setIsDiagnosticsOpen(false)}
         />
       )}
 
