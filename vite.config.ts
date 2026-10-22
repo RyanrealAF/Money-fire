@@ -5,6 +5,8 @@ import {defineConfig} from 'vite';
 
 export default defineConfig(() => {
   return {
+    // Project site served from ryanrealaf.github.io/Money-fire/
+    base: '/Money-fire/',
     plugins: [react(), tailwindcss()],
     resolve: {
       alias: {
