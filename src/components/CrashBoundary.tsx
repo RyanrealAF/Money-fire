@@ -1,6 +1,6 @@
 import React from 'react';
 import { AlertTriangle, Copy, Check, RotateCcw } from 'lucide-react';
-import { logCrash, getCrashes } from '../utils/crashLog';
+import { logCrash, CrashEntry } from '../utils/crashLog';
 
 interface CrashBoundaryProps {
   children: React.ReactNode;
@@ -8,6 +8,7 @@ interface CrashBoundaryProps {
 
 interface CrashBoundaryState {
   error: Error | null;
+  entry: CrashEntry | null;
   copied: boolean;
 }
 
@@ -17,23 +18,27 @@ interface CrashBoundaryState {
  * fallback with a one-tap "copy crash report" button.
  */
 export class CrashBoundary extends React.Component<CrashBoundaryProps, CrashBoundaryState> {
-  state: CrashBoundaryState = { error: null, copied: false };
+  state: CrashBoundaryState = { error: null, entry: null, copied: false };
 
   static getDerivedStateFromError(error: Error): Partial<CrashBoundaryState> {
     return { error };
   }
 
   componentDidCatch(error: Error, errorInfo: React.ErrorInfo): void {
-    logCrash('react', error.message || 'React render crash', {
+    const entry = logCrash('react', error.message || 'React render crash', {
       stack: error.stack,
       componentStack: errorInfo.componentStack || undefined,
     });
+    // Keep the just-logged entry in memory: logCrash returns it, and
+    // localStorage persistence can silently fail (blocked/full), in which
+    // case getCrashes()[0] would hand back a stale report for an older crash.
+    this.setState({ entry });
   }
 
   private handleCopy = async () => {
-    const latest = getCrashes()[0];
-    const text = latest
-      ? JSON.stringify(latest, null, 2)
+    const entry = this.state.entry;
+    const text = entry
+      ? JSON.stringify(entry, null, 2)
       : `Crash: ${this.state.error?.message}\n${this.state.error?.stack || ''}`;
     try {
       await navigator.clipboard.writeText(text);
