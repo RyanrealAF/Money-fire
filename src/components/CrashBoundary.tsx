@@ -17,16 +17,26 @@ interface CrashBoundaryState {
  * them with the component stack to the crash log, and shows a recoverable
  * fallback with a one-tap "copy crash report" button.
  */
+/**
+ * React types boundary errors as Error, but anything can be thrown at
+ * runtime (throw null, throw "string"). Normalize so the boundary itself
+ * never throws while handling a crash.
+ */
+function normalizeError(value: unknown): Error {
+  return value instanceof Error ? value : new Error(String(value));
+}
+
 export class CrashBoundary extends React.Component<CrashBoundaryProps, CrashBoundaryState> {
   state: CrashBoundaryState = { error: null, entry: null, copied: false };
 
   static getDerivedStateFromError(error: Error): Partial<CrashBoundaryState> {
-    return { error };
+    return { error: normalizeError(error) };
   }
 
   componentDidCatch(error: Error, errorInfo: React.ErrorInfo): void {
-    const entry = logCrash('react', error.message || 'React render crash', {
-      stack: error.stack,
+    const normalized = normalizeError(error);
+    const entry = logCrash('react', normalized.message || 'React render crash', {
+      stack: normalized.stack,
       componentStack: errorInfo.componentStack || undefined,
     });
     // Keep the just-logged entry in memory: logCrash returns it, and
